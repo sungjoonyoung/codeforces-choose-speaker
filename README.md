@@ -12,7 +12,7 @@
 
 ## 🚀 주요 기능
 - **간편한 데이터 로드**: 코드포스 **FRIENDS STANDING** 페이지에서 `Ctrl+A` -> `Ctrl+C` 후 바로 붙여넣기만 하면 파싱이 완료됩니다.
-- **다양한 포맷 지원**: `+` 방식(Div 3 등)과 점수제 방식(Div 2 Unrated 등)을 모두 지원하며, 유저 핸들(예: `sungso376`) 내 숫자를 정확히 보존합니다.
+- **다양한 포맷 지원**: `+` 방식과 점수제 방식을 모두 지원하며, 유저 핸들(예: `sungso376`) 내 숫자를 정확히 보존합니다.
 - **최적의 발표자 매칭**: 최대한 많은 스터디원이 서로 다른 문제를 하나씩 발표할 수 있도록(Unique matching) 알고리즘이 자동으로 배정합니다.
 - **수동 편집 및 보정**: 파싱이 완벽하지 않거나 특정 유저를 제외/추가해야 할 때 테이블에서 직접 수정할 수 있습니다.
 - **다국어 지원**: 한국어와 영어 UI를 제공합니다.
@@ -45,7 +45,7 @@ A web-based tool designed to fairly and quickly select speakers for each problem
 
 ## 🚀 Features
 - **Easy Data Loading**: Simply `Ctrl+A` -> `Ctrl+C` on the Codeforces **FRIENDS STANDING** page and paste it directly. Parsing is done automatically.
-- **Support for Various Formats**: Supports both `+` marker style (e.g., Div 3) and score-based style (e.g., Div 2 Unrated). It accurately preserves user handles containing numbers (e.g., `sungso376`).
+- **Support for Various Formats**: Supports both `+` marker style and score-based style. It accurately preserves user handles containing numbers (e.g., `sungso376`).
 - **Optimal Speaker Matching**: An algorithm automatically assigns speakers to ensure that as many study members as possible can present different problems (Unique matching).
 - **Manual Editing & Correction**: You can manually edit the table if the parsing isn't perfect or if you need to add/remove specific participants.
 - **Multilingual Support**: Provides UI in both Korean and English.
