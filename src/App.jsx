@@ -55,76 +55,78 @@ function App() {
   const curT = t[lang]
 
   const parseData = () => {
-    const lines = rawData.split('\n').map(l => l.trim())
+    const lines = rawData.split('\n').map(l => l.trim()).filter(l => l)
     const participantBlocks = []
     let currentBlock = null
 
+    // 1. 블록 분리 및 Unofficial 데이터(*) 차단
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
-      if (!line) continue
+      if (line.includes('*')) break;
 
-      const rankMatch = line.match(/^(\d+)\s+\((\d+)\)(.*)$/)
+      const rankMatch = line.match(/^\s*(\d+)\s*\(\s*(\d+)\s*\)\s*(.*)$/)
       if (rankMatch) {
         if (currentBlock) participantBlocks.push(currentBlock)
-        currentBlock = { rank: rankMatch[1], nameContent: rankMatch[3], extraLines: [] }
+        currentBlock = { rank: rankMatch[1], header: rankMatch[3], extra: [] }
       } else if (currentBlock) {
-        if (line.startsWith('Accepted') || line.startsWith('Tried')) {
+        if (line.startsWith('Accepted') || line.startsWith('Tried') || line.includes('Copyright')) {
           participantBlocks.push(currentBlock)
           currentBlock = null
           break
         }
-        currentBlock.extraLines.push(line)
+        currentBlock.extra.push(line)
       }
     }
     if (currentBlock) participantBlocks.push(currentBlock)
 
-    let maxTokenCount = 8
     const countries = ['South Korea', 'Korea, Republic of', 'United States', 'China', 'Russia', 'Japan', 'India', 'Kazakhstan', 'Vietnam', 'Ukraine', 'Poland', 'Germany', 'France', 'United Kingdom', 'Brazil', 'Canada', 'Belarus', 'Taiwan', 'Hong Kong', 'Singapore', 'Uzbekistan', 'Kyrgyzstan']
     const countryRegex = new RegExp(`^(${countries.join('|')})`, 'i')
 
-    const parsedParticipants = participantBlocks.map(block => {
-      let content = block.nameContent.trim()
-      content = content.replace(countryRegex, '').trim()
-      content = content.replace(/^\*\s+/, '').trim()
+    let maxSolveTokens = 8
 
-      // 모든 잠재적 토큰 추출 (+, -, 점수)
-      // 이름 부분과 데이터 부분을 분리하기 위해 첫 번째 토큰 위치 탐색
-      const tokens = []
-      const allText = [content, ...block.extraLines].join(' ')
+    const parsed = participantBlocks.map(block => {
+      let headerText = block.header.trim().replace(countryRegex, '').trim();
       
-      // 정규식 설명: 
-      // 1. [\+\-]\d+ (예: +1, -3)
-      // 2. (?<!\d)\d{3,}(?!\d) (예: 492, 1244 - 시간과 구분되는 3자리 이상 숫자)
-      // 3. \+ 또는 \- (단독 기호)
-      // 4. (-\d+)(\d{3,}) (예: -31348 -> -3, 1348 분리)
-      
-      // 먼저 합쳐진 케이스 분리
-      let cleanedText = allText.replace(/(-\d+)(\d{3,})/g, '$1 $2')
-      
-      // 시간(00:00) 제거
-      cleanedText = cleanedText.replace(/\d{2}:\d{2}/g, ' ')
+      // 2. 이름 및 요약 데이터(#) 분리
+      // 예: sungso376#6225 -> name: sungso376, summary: 6225
+      const hashIdx = headerText.indexOf('#');
+      let name = "";
+      let summaryText = "";
+      let remainingHeader = "";
 
-      const foundTokens = cleanedText.match(/([\+\-]\d+|[\+\-]|(?<![:\d])\d{3,}(?![:\d]))/g) || []
-      
-      // 이름 추출: 첫 번째 토큰이 나오기 전까지의 텍스트
-      let name = block.nameContent.trim().replace(countryRegex, '').trim().replace(/^\*\s+/, '').trim()
-      if (foundTokens.length > 0) {
-        const firstToken = foundTokens[0]
-        const firstIdx = content.indexOf(firstToken)
-        if (firstIdx !== -1) {
-          name = content.substring(0, firstIdx).trim()
+      if (hashIdx !== -1) {
+        name = headerText.substring(0, hashIdx).trim();
+        const afterHash = headerText.substring(hashIdx + 1);
+        const firstSpace = afterHash.indexOf(' ');
+        if (firstSpace !== -1) {
+          summaryText = afterHash.substring(0, firstSpace);
+          remainingHeader = afterHash.substring(firstSpace);
+        } else {
+          summaryText = afterHash;
         }
+      } else {
+        const words = headerText.split(/\s+/);
+        name = words[0];
+        remainingHeader = words.slice(1).join(' ');
       }
-      
-      // 유저 핸들에서 # 뒷부분 등 정리
-      name = name.split(/\s+/)[0].replace(/#\d+$/, '')
 
-      if (foundTokens.length > maxTokenCount) maxTokenCount = foundTokens.length
+      // 3. 문제 풀이 토큰 추출
+      const combinedSolveText = [remainingHeader, ...block.extra].join(' ');
+      let cleaned = combinedSolveText.replace(/\d{2}:\d{2}/g, ' '); // 시간 제거
+      cleaned = cleaned.replace(/(-\d+)(\d{3,})/g, '$1 $2'); // 합쳐진 토큰 분리
+      
+      const allTokens = cleaned.match(/([\+\-]\d+|[\+\-]|(?<![:\d])\d{3,}(?![:\d])|\b\d+\b)/g) || [];
+      
+      // #이 없는 경우 첫 번째 숫자는 총점일 가능성이 높으므로 제거
+      const solveTokens = (hashIdx === -1 && allTokens.length > 0) ? allTokens.slice(1) : allTokens;
+
+      if (solveTokens.length > maxSolveTokens) maxSolveTokens = solveTokens.length
 
       const solved = new Array(20).fill(false)
-      foundTokens.forEach((token, idx) => {
+      solveTokens.forEach((token, idx) => {
         if (idx < 20) {
-          if (token.startsWith('+') || (parseInt(token) >= 100)) {
+          // +기호이거나 100점 이상의 점수면 해결로 간주
+          if (token.startsWith('+') || parseInt(token) >= 100) {
             solved[idx] = true
           }
         }
@@ -132,19 +134,14 @@ function App() {
 
       return {
         id: Math.random().toString(36).substr(2, 9),
-        name: name || `User ${block.rank}`,
+        name: name || `User${block.rank}`,
         solved
       }
     })
 
-    const finalProblemCount = Math.max(maxTokenCount, 8)
-    const newProblems = Array.from({ length: finalProblemCount }, (_, i) => String.fromCharCode(65 + i))
-    
-    setProblems(newProblems)
-    setParticipants(parsedParticipants.map(p => ({
-      ...p,
-      solved: p.solved.slice(0, finalProblemCount)
-    })))
+    const finalCount = Math.max(maxSolveTokens, 8)
+    setProblems(Array.from({ length: finalCount }, (_, i) => String.fromCharCode(65 + i)))
+    setParticipants(parsed.map(p => ({ ...p, solved: p.solved.slice(0, finalCount) })))
     setAssignments({})
   }
 
@@ -172,37 +169,35 @@ function App() {
 
   const addManualParticipant = () => {
     if (!newName.trim()) return
-    const newP = {
+    setParticipants([...participants, {
       id: Math.random().toString(36).substr(2, 9),
       name: newName.trim(),
       solved: new Array(problems.length).fill(false)
-    }
-    setParticipants([...participants, newP])
+    }])
     setNewName('')
   }
 
   const selectSpeakers = () => {
     const newAssignments = {}
-    const usedSpeakers = new Set()
+    const used = new Set()
     const probInfo = problems.map((name, idx) => ({
       name, idx, solvers: participants.filter(p => p.solved[idx])
     })).sort((a, b) => a.solvers.length - b.solvers.length)
     
-    for (const prob of probInfo) {
-      const potentialSolvers = prob.solvers.filter(p => !usedSpeakers.has(p.id)).sort(() => Math.random() - 0.5)
-      if (potentialSolvers.length > 0) {
-        const selected = potentialSolvers[0]
-        newAssignments[prob.name] = selected.name
-        usedSpeakers.add(selected.id)
+    probInfo.forEach(prob => {
+      const potential = prob.solvers.filter(p => !used.has(p.id)).sort(() => Math.random() - 0.5)
+      if (potential.length > 0) {
+        newAssignments[prob.name] = potential[0].name
+        used.add(potential[0].id)
       }
-    }
+    })
 
-    for (const prob of probInfo) {
+    probInfo.forEach(prob => {
       if (!newAssignments[prob.name]) {
-        const potentialSolvers = prob.solvers.sort(() => Math.random() - 0.5)
-        newAssignments[prob.name] = potentialSolvers.length > 0 ? potentialSolvers[0].name : curT.noSolver
+        const potential = prob.solvers.sort(() => Math.random() - 0.5)
+        newAssignments[prob.name] = potential.length > 0 ? potential[0].name : curT.noSolver
       }
-    }
+    })
     setAssignments(newAssignments)
   }
 
@@ -235,8 +230,7 @@ function App() {
             <h2>{curT.manage}</h2>
             <div className="table-controls">
               <button onClick={() => {
-                const nextChar = String.fromCharCode(65 + problems.length)
-                setProblems([...problems, nextChar])
+                setProblems([...problems, String.fromCharCode(65 + problems.length)])
                 setParticipants(participants.map(p => ({ ...p, solved: [...p.solved, false] })))
               }}>{curT.addProb}</button>
               <button onClick={() => {
