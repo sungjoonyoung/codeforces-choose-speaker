@@ -1,34 +1,73 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './App.css'
 
+const t = {
+  ko: {
+    title: '코드포스 발표자 선정기',
+    subtitle: '순위표를 복사해 붙여넣으면 문제별 발표자를 정해줍니다.',
+    placeholder: 'Friends standing 페이지에서 Ctrl+A -> Ctrl+V 하세요...',
+    clear: '초기화',
+    parse: '데이터 파싱 및 로드',
+    manage: '대진표 관리',
+    addProb: '문제 추가',
+    delProb: '문제 삭제',
+    pick: '발표자 랜덤 선정',
+    hint: '💡 셀의 화살표(→)를 클릭하면 해당 위치부터 오른쪽으로 밀립니다.',
+    shiftTitle: '여기서부터 오른쪽으로 밀기',
+    delete: '삭제',
+    results: '최종 발표자 명단',
+    noSolver: '해결자 없음',
+    addUser: '참여자 수동 추가',
+    addBtn: '추가',
+    namePlace: '이름 입력...',
+    lang: 'English'
+  },
+  en: {
+    title: 'CF Speaker Selector',
+    subtitle: 'Paste standings to choose speakers for each problem.',
+    placeholder: 'Ctrl+A -> Ctrl+V your friends standings here...',
+    clear: 'Clear',
+    parse: 'Parse & Load',
+    manage: 'Manage Standings',
+    addProb: 'Add Prob',
+    delProb: 'Del Prob',
+    pick: 'Pick Speakers',
+    hint: '💡 Click (→) in a cell to shift solves from that position.',
+    shiftTitle: 'Shift right from here',
+    delete: 'Del',
+    results: 'Speaker Assignments',
+    noSolver: 'No Solver',
+    addUser: 'Add Participant',
+    addBtn: 'Add',
+    namePlace: 'Enter name...',
+    lang: '한국어'
+  }
+}
+
 function App() {
+  const [lang, setLang] = useState('ko')
   const [rawData, setRawData] = useState('')
   const [participants, setParticipants] = useState([])
   const [problems, setProblems] = useState(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
   const [assignments, setAssignments] = useState({})
+  const [newName, setNewName] = useState('')
+
+  const curT = t[lang]
 
   const parseData = () => {
     const lines = rawData.split('\n').map(l => l.trim())
     const participantBlocks = []
     let currentBlock = null
 
-    // 1. 블록 단위 분리 (순위와 이름이 있는 라인 기준)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       if (!line) continue
 
-      // 순위 매칭 (예: "1 (1308)" 또는 "10 (123)")
       const rankMatch = line.match(/^(\d+)\s+\((\d+)\)(.*)$/)
       if (rankMatch) {
         if (currentBlock) participantBlocks.push(currentBlock)
-        currentBlock = {
-          rank: rankMatch[1],
-          rating: rankMatch[2],
-          nameContent: rankMatch[3],
-          extraLines: []
-        }
+        currentBlock = { rank: rankMatch[1], nameContent: rankMatch[3], extraLines: [] }
       } else if (currentBlock) {
-        // 하단 요약 정보(Accepted/Tried 등)가 나오면 중단
         if (line.startsWith('Accepted') || line.startsWith('Tried')) {
           participantBlocks.push(currentBlock)
           currentBlock = null
@@ -39,55 +78,53 @@ function App() {
     }
     if (currentBlock) participantBlocks.push(currentBlock)
 
-    // 2. 블록별 토큰 추출 및 파싱
     let maxTokenCount = 8
     const countries = ['South Korea', 'Korea, Republic of', 'United States', 'China', 'Russia', 'Japan', 'India', 'Kazakhstan', 'Vietnam', 'Ukraine', 'Poland', 'Germany', 'France', 'United Kingdom', 'Brazil', 'Canada', 'Belarus', 'Taiwan', 'Hong Kong', 'Singapore', 'Uzbekistan', 'Kyrgyzstan']
     const countryRegex = new RegExp(`^(${countries.join('|')})`, 'i')
 
     const parsedParticipants = participantBlocks.map(block => {
-      let name = block.nameContent.trim()
-      const tokens = []
+      let content = block.nameContent.trim()
+      content = content.replace(countryRegex, '').trim()
+      content = content.replace(/^\*\s+/, '').trim()
 
-      // 이름 라인 끝에 붙은 토큰(+나 점수) 확인
-      const trailingTokenMatch = name.match(/^(.*?)\s+([\+\-]\d+|[\+\-]|\d{3,})$/)
-      if (trailingTokenMatch) {
-        name = trailingTokenMatch[1].trim()
-        tokens.push(trailingTokenMatch[2])
-      } else {
-        // 끝에 공백 없이 +가 붙은 경우 처리
-        const simplePlusMatch = name.match(/^(.*?)(\+)$/)
-        if (simplePlusMatch) {
-          name = simplePlusMatch[1].trim()
-          tokens.push('+')
+      // 모든 잠재적 토큰 추출 (+, -, 점수)
+      // 이름 부분과 데이터 부분을 분리하기 위해 첫 번째 토큰 위치 탐색
+      const tokens = []
+      const allText = [content, ...block.extraLines].join(' ')
+      
+      // 정규식 설명: 
+      // 1. [\+\-]\d+ (예: +1, -3)
+      // 2. (?<!\d)\d{3,}(?!\d) (예: 492, 1244 - 시간과 구분되는 3자리 이상 숫자)
+      // 3. \+ 또는 \- (단독 기호)
+      // 4. (-\d+)(\d{3,}) (예: -31348 -> -3, 1348 분리)
+      
+      // 먼저 합쳐진 케이스 분리
+      let cleanedText = allText.replace(/(-\d+)(\d{3,})/g, '$1 $2')
+      
+      // 시간(00:00) 제거
+      cleanedText = cleanedText.replace(/\d{2}:\d{2}/g, ' ')
+
+      const foundTokens = cleanedText.match(/([\+\-]\d+|[\+\-]|(?<![:\d])\d{3,}(?![:\d]))/g) || []
+      
+      // 이름 추출: 첫 번째 토큰이 나오기 전까지의 텍스트
+      let name = block.nameContent.trim().replace(countryRegex, '').trim().replace(/^\*\s+/, '').trim()
+      if (foundTokens.length > 0) {
+        const firstToken = foundTokens[0]
+        const firstIdx = content.indexOf(firstToken)
+        if (firstIdx !== -1) {
+          name = content.substring(0, firstIdx).trim()
         }
       }
+      
+      // 유저 핸들에서 # 뒷부분 등 정리
+      name = name.split(/\s+/)[0].replace(/#\d+$/, '')
 
-      // 국가명 제거
-      name = name.replace(countryRegex, '').trim()
-      // 이름에 포함된 별표나 특수문자 정리
-      name = name.replace(/^\*\s+/, '').trim()
+      if (foundTokens.length > maxTokenCount) maxTokenCount = foundTokens.length
 
-      // 추가 라인에서 토큰 추출
-      block.extraLines.forEach(line => {
-        if (line.match(/^\d{2}:\d{2}$/)) return // 시간 정보 무시
-        
-        // Case 2: "-31348" 같이 합쳐진 토큰 처리
-        const mergedMatch = line.match(/^(-\d+)(\d{3,})$/)
-        if (mergedMatch) {
-          tokens.push(mergedMatch[1])
-          tokens.push(mergedMatch[2])
-        } else if (line.startsWith('+') || line.startsWith('-') || line.match(/^-?\d+$/)) {
-          tokens.push(line)
-        }
-      })
-
-      if (tokens.length > maxTokenCount) maxTokenCount = tokens.length
-
-      // 토큰을 해결 여부로 변환 (최대 20문제까지 일단 저장)
       const solved = new Array(20).fill(false)
-      tokens.forEach((token, idx) => {
+      foundTokens.forEach((token, idx) => {
         if (idx < 20) {
-          if (token.startsWith('+') || parseInt(token) >= 100) {
+          if (token.startsWith('+') || (parseInt(token) >= 100)) {
             solved[idx] = true
           }
         }
@@ -100,7 +137,6 @@ function App() {
       }
     })
 
-    // 문제 수에 맞게 배열 슬라이싱
     const finalProblemCount = Math.max(maxTokenCount, 8)
     const newProblems = Array.from({ length: finalProblemCount }, (_, i) => String.fromCharCode(65 + i))
     
@@ -123,73 +159,37 @@ function App() {
     }))
   }
 
-  // 특정 위치부터 오른쪽으로 한 칸 밀기 (중간에 푼 문제가 비어있는 경우 대응)
   const shiftFrom = (pId, startIdx) => {
     setParticipants(participants.map(p => {
       if (p.id === pId) {
         const newSolved = [...p.solved]
-        newSolved.splice(startIdx, 0, false) // 해당 위치에 false 삽입
+        newSolved.splice(startIdx, 0, false)
         return { ...p, solved: newSolved.slice(0, problems.length) }
       }
       return p
     }))
   }
 
-  const shiftRow = (pId, direction) => {
-    setParticipants(participants.map(p => {
-      if (p.id === pId) {
-        const newSolved = new Array(problems.length).fill(false)
-        for (let i = 0; i < problems.length; i++) {
-          const newIdx = i + direction
-          if (newIdx >= 0 && newIdx < problems.length) {
-            newSolved[newIdx] = p.solved[i]
-          }
-        }
-        return { ...p, solved: newSolved }
-      }
-      return p
-    }))
-  }
-
-  const removeParticipant = (pId) => {
-    setParticipants(participants.filter(p => p.id !== pId))
-  }
-
-  const addProblem = () => {
-    const nextChar = String.fromCharCode(65 + problems.length)
-    setProblems([...problems, nextChar])
-    setParticipants(participants.map(p => ({
-      ...p,
-      solved: [...p.solved, false]
-    })))
-  }
-
-  const removeProblem = () => {
-    if (problems.length <= 1) return
-    setProblems(problems.slice(0, -1))
-    setParticipants(participants.map(p => ({
-      ...p,
-      solved: p.solved.slice(0, -1)
-    })))
+  const addManualParticipant = () => {
+    if (!newName.trim()) return
+    const newP = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: newName.trim(),
+      solved: new Array(problems.length).fill(false)
+    }
+    setParticipants([...participants, newP])
+    setNewName('')
   }
 
   const selectSpeakers = () => {
     const newAssignments = {}
     const usedSpeakers = new Set()
-    
-    // 문제별로 푼 사람 수 계산 (적게 푼 문제부터 우선 할당하여 유니크함 극대화)
     const probInfo = problems.map((name, idx) => ({
-      name,
-      idx,
-      solvers: participants.filter(p => p.solved[idx])
+      name, idx, solvers: participants.filter(p => p.solved[idx])
     })).sort((a, b) => a.solvers.length - b.solvers.length)
     
-    // 1차: 중복 없이 할당 시도
     for (const prob of probInfo) {
-      const potentialSolvers = prob.solvers
-        .filter(p => !usedSpeakers.has(p.id))
-        .sort(() => Math.random() - 0.5)
-      
+      const potentialSolvers = prob.solvers.filter(p => !usedSpeakers.has(p.id)).sort(() => Math.random() - 0.5)
       if (potentialSolvers.length > 0) {
         const selected = potentialSolvers[0]
         newAssignments[prob.name] = selected.name
@@ -197,62 +197,64 @@ function App() {
       }
     }
 
-    // 2차: 할당 안 된 문제에 대해 중복 허용하여 할당
     for (const prob of probInfo) {
       if (!newAssignments[prob.name]) {
-        const potentialSolvers = prob.solvers
-          .sort(() => Math.random() - 0.5)
-        
-        if (potentialSolvers.length > 0) {
-          newAssignments[prob.name] = potentialSolvers[0].name
-        } else {
-          newAssignments[prob.name] = '해결자 없음'
-        }
+        const potentialSolvers = prob.solvers.sort(() => Math.random() - 0.5)
+        newAssignments[prob.name] = potentialSolvers.length > 0 ? potentialSolvers[0].name : curT.noSolver
       }
     }
-
     setAssignments(newAssignments)
   }
 
   return (
     <div className="container">
+      <div className="lang-toggle">
+        <button onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}>{curT.lang}</button>
+      </div>
       <header>
-        <h1>Codeforces Speaker Selector</h1>
-        <p className="subtitle">순위표를 복사해 붙여넣으면 문제별 발표자를 정해줍니다.</p>
+        <h1>{curT.title}</h1>
+        <p className="subtitle">{curT.subtitle}</p>
       </header>
       
       <section className="input-section">
         <textarea 
-          placeholder="Friends standing 페이지에서 Ctrl+A -> Ctrl+V 하세요..."
+          placeholder={curT.placeholder}
           value={rawData}
           onChange={(e) => setRawData(e.target.value)}
-          rows={6}
+          rows={5}
         />
         <div className="actions">
-          <button onClick={() => {setParticipants([]); setAssignments({}); setRawData('')}}>초기화</button>
-          <button onClick={parseData} className="primary-btn">데이터 파싱 및 로드</button>
+          <button onClick={() => {setParticipants([]); setAssignments({}); setRawData('')}}>{curT.clear}</button>
+          <button onClick={parseData} className="primary-btn">{curT.parse}</button>
         </div>
       </section>
 
       {participants.length > 0 && (
         <section className="table-section">
           <div className="table-header-flex">
-            <h2>대진표 관리</h2>
+            <h2>{curT.manage}</h2>
             <div className="table-controls">
-              <button onClick={addProblem}>문제 추가</button>
-              <button onClick={removeProblem}>문제 삭제</button>
-              <button onClick={selectSpeakers} className="success-btn">발표자 랜덤 선정</button>
+              <button onClick={() => {
+                const nextChar = String.fromCharCode(65 + problems.length)
+                setProblems([...problems, nextChar])
+                setParticipants(participants.map(p => ({ ...p, solved: [...p.solved, false] })))
+              }}>{curT.addProb}</button>
+              <button onClick={() => {
+                if (problems.length <= 1) return
+                setProblems(problems.slice(0, -1))
+                setParticipants(participants.map(p => ({ ...p, solved: p.solved.slice(0, -1) })))
+              }}>{curT.delProb}</button>
+              <button onClick={selectSpeakers} className="success-btn">{curT.pick}</button>
             </div>
           </div>
-          <p className="hint">💡 <b>셀의 화살표(→)</b>를 클릭하면 해당 위치부터 오른쪽으로 밀립니다 (건너뛴 문제 보정용)</p>
+          <p className="hint">{curT.hint}</p>
           <div className="table-container">
             <table className="standings-table">
               <thead>
                 <tr>
                   <th>Name</th>
                   {problems.map(p => <th key={p}>{p}</th>)}
-                  <th>전체 이동</th>
-                  <th>관리</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,44 +262,41 @@ function App() {
                   <tr key={p.id}>
                     <td className="name-cell">{p.name}</td>
                     {p.solved.map((isSolved, idx) => (
-                      <td 
-                        key={idx} 
-                        className={`solve-cell ${isSolved ? 'solved' : 'not-solved'}`}
-                      >
+                      <td key={idx} className={`solve-cell ${isSolved ? 'solved' : 'not-solved'}`}>
                         <div className="cell-content">
                           <span className="check" onClick={() => toggleSolve(p.id, idx)}>
-                            {isSolved ? '✔' : ''}
+                            {isSolved ? '✔' : '-'}
                           </span>
-                          <button 
-                            className="mini-shift" 
-                            onClick={() => shiftFrom(p.id, idx)}
-                            title="여기서부터 오른쪽으로 밀기"
-                          >
-                            →
-                          </button>
+                          <button className="mini-shift" onClick={() => shiftFrom(p.id, idx)} title={curT.shiftTitle}>→</button>
                         </div>
                       </td>
                     ))}
                     <td>
-                      <div className="shift-btns">
-                        <button onClick={() => shiftRow(p.id, -1)}>←</button>
-                        <button onClick={() => shiftRow(p.id, 1)}>→</button>
-                      </div>
-                    </td>
-                    <td>
-                      <button onClick={() => removeParticipant(p.id)} className="danger-text">삭제</button>
+                      <button onClick={() => setParticipants(participants.filter(pt => pt.id !== p.id))} className="danger-text">{curT.delete}</button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          
+          <div className="add-user-form">
+            <h4>{curT.addUser}</h4>
+            <input 
+              type="text" 
+              placeholder={curT.namePlace} 
+              value={newName} 
+              onChange={(e) => setNewName(e.target.value)} 
+              onKeyPress={(e) => e.key === 'Enter' && addManualParticipant()}
+            />
+            <button onClick={addManualParticipant}>{curT.addBtn}</button>
+          </div>
         </section>
       )}
 
       {Object.keys(assignments).length > 0 && (
         <section className="results-section">
-          <h2>최종 발표자 명단</h2>
+          <h2>{curT.results}</h2>
           <div className="assignment-grid">
             {problems.map(p => (
               <div key={p} className="assignment-card">
