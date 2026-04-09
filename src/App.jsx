@@ -1,10 +1,61 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
 
+// 고해상도 최적화 태극기 (표준 S자 곡선 및 4괘 반영)
+const FlagKR = () => (
+  <svg width="24" height="16" viewBox="0 0 36 24" className="flag-icon">
+    <rect width="36" height="24" fill="#fff" rx="1"/>
+    <g transform="translate(18,12) rotate(-33.7)">
+      {/* 태극 문양 (S자 곡선) */}
+      <circle r="6" fill="#0047A0"/>
+      <path d="M-6 0a6 6 0 1 1 12 0a3 3 0 1 1-6 0a3 3 0 1 0-6 0" fill="#CD2E3A"/>
+      
+      <g fill="#000">
+        {/* 건 (왼쪽 위) */}
+        <g transform="translate(-11, 0)">
+          <rect x="-0.5" y="-3.5" width="1.1" height="7"/>
+          <rect x="-2.1" y="-3.5" width="1.1" height="7"/>
+          <rect x="1.1" y="-3.5" width="1.1" height="7"/>
+        </g>
+        {/* 곤 (오른쪽 아래) */}
+        <g transform="translate(11, 0)">
+          <rect x="-0.5" y="-3.5" width="1.1" height="3.2"/><rect x="-0.5" y="0.3" width="1.1" height="3.2"/>
+          <rect x="-2.1" y="-3.5" width="1.1" height="3.2"/><rect x="-2.1" y="0.3" width="1.1" height="3.2"/>
+          <rect x="1.1" y="-3.5" width="1.1" height="3.2"/><rect x="1.1" y="0.3" width="1.1" height="3.2"/>
+        </g>
+        {/* 이 (왼쪽 아래) */}
+        <g transform="rotate(67.4) translate(-11, 0)">
+          <rect x="-0.5" y="-3.5" width="1.1" height="7"/>
+          <rect x="-2.1" y="-3.5" width="1.1" height="3.2"/><rect x="-2.1" y="0.3" width="1.1" height="3.2"/>
+          <rect x="1.1" y="-3.5" width="1.1" height="7"/>
+        </g>
+        {/* 감 (오른쪽 위) */}
+        <g transform="rotate(67.4) translate(11, 0)">
+          <rect x="-0.5" y="-3.5" width="1.1" height="7"/>
+          <rect x="-2.1" y="-3.5" width="1.1" height="3.2"/><rect x="-2.1" y="0.3" width="1.1" height="3.2"/>
+          <rect x="1.1" y="-3.5" width="1.1" height="3.2"/><rect x="1.1" y="0.3" width="1.1" height="3.2"/>
+        </g>
+      </g>
+    </g>
+  </svg>
+)
+
+// 단순화된 성조기 SVG
+const FlagUS = () => (
+  <svg width="24" height="16" viewBox="0 0 741 390" className="flag-icon">
+    <rect width="741" height="390" fill="#bf0a30" rx="2"/>
+    <path d="M0 30h741M0 90h741M0 150h741M0 210h741M0 270h741M0 330h741" stroke="#fff" strokeWidth="30"/>
+    <rect width="296" height="210" fill="#002868"/>
+    <g fill="#fff">
+      {[0, 60, 120, 180, 240].map(x => [30, 90, 150].map(y => <circle key={`${x}-${y}`} cx={x + 30} cy={y} r="10" />))}
+    </g>
+  </svg>
+)
+
 const t = {
   ko: {
     title: '코드포스 발표자 선정기',
-    subtitle: '순위표를 복사해 붙여넣으면 문제별 발표자를 정해줍니다.',
+    subtitle: 'FRIENDS STANDING에서 Ctrl+A 후 복사해 붙여넣으면 문제별 발표자를 정해줍니다.',
     placeholder: 'Friends standing 페이지에서 Ctrl+A -> Ctrl+V 하세요...',
     clear: '초기화',
     parse: '데이터 파싱 및 로드',
@@ -20,11 +71,11 @@ const t = {
     addUser: '참여자 수동 추가',
     addBtn: '추가',
     namePlace: '이름 입력...',
-    langLabel: '🇺🇸 English'
+    langLabel: 'English'
   },
   en: {
     title: 'CF Speaker Selector',
-    subtitle: 'Paste standings to choose speakers for each problem.',
+    subtitle: 'Ctrl+A and copy-paste from FRIENDS STANDING to choose speakers.',
     placeholder: 'Ctrl+A -> Ctrl+V your friends standings here...',
     clear: 'Clear',
     parse: 'Parse & Load',
@@ -40,7 +91,7 @@ const t = {
     addUser: 'Add Participant',
     addBtn: 'Add',
     namePlace: 'Enter name...',
-    langLabel: '🇰🇷 한국어'
+    langLabel: '한국어'
   }
 }
 
@@ -55,7 +106,6 @@ function App() {
   const resultsRef = useRef(null)
   const curT = t[lang]
 
-  // 결과 창이 업데이트될 때마다 자동으로 스크롤
   useEffect(() => {
     if (Object.keys(assignments).length > 0 && resultsRef.current) {
       resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -199,7 +249,8 @@ function App() {
     <div className="container">
       <div className="lang-toggle">
         <button className="lang-btn" onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}>
-          {curT.langLabel}
+          {lang === 'ko' ? <FlagUS /> : <FlagKR />}
+          <span>{curT.langLabel}</span>
         </button>
       </div>
       <header>
