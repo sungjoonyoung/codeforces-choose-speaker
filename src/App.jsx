@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './App.css'
 
 const t = {
@@ -12,7 +12,7 @@ const t = {
     addProb: '문제 추가',
     delProb: '문제 삭제',
     pick: '발표자 랜덤 선정',
-    hint: '💡 셀의 화살표(→)를 클릭하면 해당 위치부터 오른쪽으로 밀립니다.',
+    hint: '💡 셀 하단의 회색 화살표(→)를 클릭하면 해당 위치부터 오른쪽으로 밀립니다.',
     shiftTitle: '여기서부터 오른쪽으로 밀기',
     delete: '삭제',
     results: '최종 발표자 명단',
@@ -20,7 +20,7 @@ const t = {
     addUser: '참여자 수동 추가',
     addBtn: '추가',
     namePlace: '이름 입력...',
-    lang: 'English'
+    langLabel: '🇺🇸 English'
   },
   en: {
     title: 'CF Speaker Selector',
@@ -32,7 +32,7 @@ const t = {
     addProb: 'Add Prob',
     delProb: 'Del Prob',
     pick: 'Pick Speakers',
-    hint: '💡 Click (→) in a cell to shift solves from that position.',
+    hint: '💡 Click gray arrow (→) in a cell to shift solves from that position.',
     shiftTitle: 'Shift right from here',
     delete: 'Del',
     results: 'Speaker Assignments',
@@ -40,7 +40,7 @@ const t = {
     addUser: 'Add Participant',
     addBtn: 'Add',
     namePlace: 'Enter name...',
-    lang: '한국어'
+    langLabel: '🇰🇷 한국어'
   }
 }
 
@@ -51,15 +51,22 @@ function App() {
   const [problems, setProblems] = useState(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
   const [assignments, setAssignments] = useState({})
   const [newName, setNewName] = useState('')
-
+  
+  const resultsRef = useRef(null)
   const curT = t[lang]
+
+  // 결과 창이 업데이트될 때마다 자동으로 스크롤
+  useEffect(() => {
+    if (Object.keys(assignments).length > 0 && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [assignments])
 
   const parseData = () => {
     const lines = rawData.split('\n').map(l => l.trim()).filter(l => l)
     const participantBlocks = []
     let currentBlock = null
 
-    // 1. 블록 분리 및 Unofficial 데이터(*) 차단
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       if (line.includes('*')) break;
@@ -86,38 +93,26 @@ function App() {
 
     const parsed = participantBlocks.map(block => {
       let headerText = block.header.trim().replace(countryRegex, '').trim();
-      
-      // 2. 이름 및 요약 데이터(#) 분리
-      // 예: sungso376#6225 -> name: sungso376, summary: 6225
       const hashIdx = headerText.indexOf('#');
       let name = "";
-      let summaryText = "";
       let remainingHeader = "";
 
       if (hashIdx !== -1) {
         name = headerText.substring(0, hashIdx).trim();
         const afterHash = headerText.substring(hashIdx + 1);
         const firstSpace = afterHash.indexOf(' ');
-        if (firstSpace !== -1) {
-          summaryText = afterHash.substring(0, firstSpace);
-          remainingHeader = afterHash.substring(firstSpace);
-        } else {
-          summaryText = afterHash;
-        }
+        remainingHeader = firstSpace !== -1 ? afterHash.substring(firstSpace) : "";
       } else {
         const words = headerText.split(/\s+/);
         name = words[0];
         remainingHeader = words.slice(1).join(' ');
       }
 
-      // 3. 문제 풀이 토큰 추출
       const combinedSolveText = [remainingHeader, ...block.extra].join(' ');
-      let cleaned = combinedSolveText.replace(/\d{2}:\d{2}/g, ' '); // 시간 제거
-      cleaned = cleaned.replace(/(-\d+)(\d{3,})/g, '$1 $2'); // 합쳐진 토큰 분리
+      let cleaned = combinedSolveText.replace(/\d{2}:\d{2}/g, ' ');
+      cleaned = cleaned.replace(/(-\d+)(\d{3,})/g, '$1 $2');
       
       const allTokens = cleaned.match(/([\+\-]\d+|[\+\-]|(?<![:\d])\d{3,}(?![:\d])|\b\d+\b)/g) || [];
-      
-      // #이 없는 경우 첫 번째 숫자는 총점일 가능성이 높으므로 제거
       const solveTokens = (hashIdx === -1 && allTokens.length > 0) ? allTokens.slice(1) : allTokens;
 
       if (solveTokens.length > maxSolveTokens) maxSolveTokens = solveTokens.length
@@ -125,7 +120,6 @@ function App() {
       const solved = new Array(20).fill(false)
       solveTokens.forEach((token, idx) => {
         if (idx < 20) {
-          // +기호이거나 100점 이상의 점수면 해결로 간주
           if (token.startsWith('+') || parseInt(token) >= 100) {
             solved[idx] = true
           }
@@ -204,7 +198,9 @@ function App() {
   return (
     <div className="container">
       <div className="lang-toggle">
-        <button onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}>{curT.lang}</button>
+        <button className="lang-btn" onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}>
+          {curT.langLabel}
+        </button>
       </div>
       <header>
         <h1>{curT.title}</h1>
@@ -289,7 +285,7 @@ function App() {
       )}
 
       {Object.keys(assignments).length > 0 && (
-        <section className="results-section">
+        <section className="results-section" ref={resultsRef}>
           <h2>{curT.results}</h2>
           <div className="assignment-grid">
             {problems.map(p => (
