@@ -55,8 +55,7 @@ const FlagUS = () => (
 const t = {
   ko: {
     title: '코드포스 발표자 선정기',
-    subtitle: 'FRIENDS STANDING에서 Ctrl+A 후 복사해 붙여넣으면 문제별 발표자를 정해줍니다.',
-    placeholder: 'Friends standing 페이지에서 Ctrl+A -> Ctrl+V 하세요...',
+    subtitle: 'FRIENDS STANDING에서 Ctrl+A 후 복사해 붙여넣으면 문제별 발표자를 정해줍니다.\n(캐럿 익스텐션을 쓰고 있다면 비활성화해 주세요!)',    placeholder: 'Friends standing 페이지에서 Ctrl+A -> Ctrl+V 하세요...',
     clear: '초기화',
     parse: '데이터 파싱 및 로드',
     manage: '대진표 관리',
@@ -75,8 +74,7 @@ const t = {
   },
   en: {
     title: 'CF Speaker Selector',
-    subtitle: 'Ctrl+A and copy-paste from FRIENDS STANDING to choose speakers.',
-    placeholder: 'Ctrl+A -> Ctrl+V your friends standings here...',
+    subtitle: 'Ctrl+A and copy-paste from FRIENDS STANDING to choose speakers.\n(Disable the Carrot extension if you are using it!)',    placeholder: 'Ctrl+A -> Ctrl+V your friends standings here...',
     clear: 'Clear',
     parse: 'Parse & Load',
     manage: 'Manage Standings',
